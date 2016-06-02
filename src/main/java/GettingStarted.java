@@ -38,46 +38,46 @@ class GettingStarted {
         String credential = "your_auth_password";
         String authUrl = "http://controller:5000/v2.0/";
 
-        NovaApi novaApi = ContextBuilder.newBuilder(provider)
+        NovaApi conn = ContextBuilder.newBuilder(provider)
                 .endpoint(authUrl)
                 .credentials(identity, credential)
                 .buildApi(NovaApi.class);
-        String region = novaApi.getConfiguredRegions().iterator().next();
+        String region = conn.getConfiguredRegions().iterator().next();
         out.println("Running in region: " + region);
 
 // # step-2
 
-        ImageApi imageApi = novaApi.getImageApi(region);
+        ImageApi imageApi = conn.getImageApi(region);
         out.println("Images in region:");
         imageApi.list().concat().forEach(image -> out.println("  " + image.getName()));
 
 // # step-3
 
-        FlavorApi flavorApi = novaApi.getFlavorApi(region);
+        FlavorApi flavorApi = conn.getFlavorApi(region);
         out.println("Flavors in region:");
         flavorApi.list().concat().forEach(flavor -> out.println("  " + flavor.getName()));
 
 // # step-4
 
         String imageId = "778e7b2e-4e67-44eb-9565-9c920e236dfd";
-        Image retrievedImage = novaApi.getImageApi(region).get(imageId);
+        Image retrievedImage = conn.getImageApi(region).get(imageId);
         out.println(retrievedImage.toString());
 
 // # step-5
 
         String flavorId = "639b8b2a-a5a6-4aa2-8592-ca765ee7af63";
-        Flavor flavor = novaApi.getFlavorApi(region).get(flavorId);
+        Flavor flavor = conn.getFlavorApi(region).get(flavorId);
         out.println(flavor.toString());
 
 // # step-6
 
         String testingInstance = "testingInstance";
-        ServerCreated testInstance = novaApi.getServerApi(region).create(testingInstance, imageId, flavorId);
+        ServerCreated testInstance = conn.getServerApi(region).create(testingInstance, imageId, flavorId);
         out.println("Server created. ID: " + testInstance.getId());
 
 // # step-7
 
-        ServerApi serverApi = novaApi.getServerApi(region);
+        ServerApi serverApi = conn.getServerApi(region);
         out.println("Instances in region:");
         serverApi.list().concat().forEach(instance -> out.println("  " + instance));
 
@@ -93,19 +93,19 @@ class GettingStarted {
 
 // # step-9
 
-        String keyPairName = "blow_fly";
-        String privateKeyFile = "/Users/martinpaulo/.ssh/" + keyPairName + ".pem";
+        String pub_key_file = "id_rsa";
+        String privateKeyFile = "~/.ssh/" + pub_key_file;
 
-        Optional<? extends KeyPairApi> keyPairApiExtension = novaApi.getKeyPairApi(region);
+        Optional<? extends KeyPairApi> keyPairApiExtension = conn.getKeyPairApi(region);
         if (keyPairApiExtension.isPresent()) {
             out.println("Checking for existing SSH keypair...");
             KeyPairApi keyPairApi = keyPairApiExtension.get();
-            boolean keyPairFound = keyPairApi.get(keyPairName) != null;
+            boolean keyPairFound = keyPairApi.get(pub_key_file) != null;
             if (keyPairFound) {
-                out.println("Keypair " + keyPairName + " already exists.");
+                out.println("Keypair " + pub_key_file + " already exists.");
             } else {
                 out.println("Creating keypair.");
-                KeyPair keyPair = keyPairApi.create(keyPairName);
+                KeyPair keyPair = keyPairApi.create(pub_key_file);
                 try {
                     Files.write(Paths.get(privateKeyFile), keyPair.getPrivateKey().getBytes());
                     out.println("Wrote " + privateKeyFile + ".");
@@ -128,7 +128,7 @@ class GettingStarted {
 
         String securityGroupName = "all-in-one";
 
-        Optional<? extends SecurityGroupApi> securityGroupApiExtension = novaApi.getSecurityGroupApi(region);
+        Optional<? extends SecurityGroupApi> securityGroupApiExtension = conn.getSecurityGroupApi(region);
         if (securityGroupApiExtension.isPresent()) {
             out.println("Checking security groups.");
 
@@ -161,7 +161,7 @@ class GettingStarted {
 
 // # step-11
 
-        String userData = "#!/usr/bin/env bash\n" +
+        String ex_userdata = "#!/usr/bin/env bash\n" +
                 " curl -L -s https://git.openstack.org/cgit/openstack/faafo/plain/contrib/install.sh | bash -s -- \\\n" +
                 "         -i faafo -i messaging -r api -r worker -r demo\n";
 
@@ -182,11 +182,11 @@ class GettingStarted {
         } else {
             out.println("Creating instance...");
             CreateServerOptions allInOneOptions = CreateServerOptions.Builder
-                    .keyPairName(keyPairName)
+                    .keyPairName(pub_key_file)
                     .securityGroupNames(securityGroupName)
-                    // In some cases, you'll need to specifically add your instance to a network...
+                    // If not running in a single-tenant network this where you add your network...
                     // .networks("79e8f822-99e1-436f-a62c-66e8d3706940")
-                    .userData(userData.getBytes());
+                    .userData(ex_userdata.getBytes());
             ServerCreated allInOneInstanceCreated = serverApi.create(instanceName, imageId, flavorId, allInOneOptions);
             ServerPredicates.awaitActive(serverApi).apply(allInOneInstanceCreated.getId());
             allInOneInstance = serverApi.get(allInOneInstanceCreated.getId());
@@ -199,8 +199,8 @@ class GettingStarted {
 
         out.println("Checking for unused floating IP's...");
         FloatingIP unusedFloatingIP = null;
-        if (novaApi.getFloatingIPApi(region).isPresent()) {
-            FloatingIPApi floatingIPApi = novaApi.getFloatingIPApi(region).get();
+        if (conn.getFloatingIPApi(region).isPresent()) {
+            FloatingIPApi floatingIPApi = conn.getFloatingIPApi(region).get();
 
             List<FloatingIP> freeIP = floatingIPApi.list().toList().stream().filter(
                     floatingIp -> floatingIp.getInstanceId() == null).collect(Collectors.toList());
@@ -228,7 +228,7 @@ class GettingStarted {
         } else if (unusedFloatingIP != null) {
             out.println("Attaching new IP, please wait...");
             // api must be present if we have managed to allocate a floating IP
-            novaApi.getFloatingIPApi(region).get().addToServer(unusedFloatingIP.getIp(), allInOneInstance.getId());
+            conn.getFloatingIPApi(region).get().addToServer(unusedFloatingIP.getIp(), allInOneInstance.getId());
             //This operation takes some indeterminate amount of time; don't move on until it's done.
             while (allInOneInstance.getAccessIPv4() != null) {
                 //Objects are not updated "live" so keep checking to make sure it's been added
