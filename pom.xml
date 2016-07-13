@@ -11,23 +11,15 @@
     <properties>
         <jclouds.version>1.9.2</jclouds.version>
     </properties>
-    <repositories>
-        <repository>
-            <id>jclouds-snapshots</id>
-            <url>https://repository.apache.org/content/repositories/snapshots</url>
-            <snapshots>
-                <enabled>true</enabled>
-            </snapshots>
-        </repository>
-    </repositories>
 
     <dependencies>
-        <!-- jclouds dependencies -->
+        <!-- the jclouds code -->
         <dependency>
-        <groupId>org.apache.jclouds</groupId>
-        <artifactId>jclouds-all</artifactId>
-        <version>${jclouds.version}</version>
+            <groupId>org.apache.jclouds</groupId>
+            <artifactId>jclouds-all</artifactId>
+            <version>${jclouds.version}</version>
         </dependency>
+        <!-- Some of the examples introduce the logging module -->
         <dependency>
             <groupId>org.apache.jclouds.driver</groupId>
             <artifactId>jclouds-slf4j</artifactId>
